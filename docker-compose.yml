@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  app:
+    image: ${IMAGE:-ghcr.io/aelbra/NOME_DO_APP:latest}
+    networks:
+      - proxy
+    environment:
+      - NODE_ENV=production
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=NOME_DO_APP
+    deploy:
+      replicas: 1
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=proxy"
+        - "traefik.http.routers.NOME_DO_APP.rule=Host(`NOME_DO_APP.ulbra.internal`)"
+        - "traefik.http.routers.NOME_DO_APP.entrypoints=internal"
+        - "traefik.http.services.NOME_DO_APP.loadbalancer.server.port=3000"
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  proxy:
+    external: true
