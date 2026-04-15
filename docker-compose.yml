@@ -15,7 +15,7 @@ services:
         - "traefik.enable=true"
         - "traefik.docker.network=proxy"
         - "traefik.http.routers.NOME_DO_APP.rule=Host(`NOME_DO_APP.ulbra.internal`)"
-        - "traefik.http.routers.NOME_DO_APP.entrypoints=internal"
+        - "traefik.http.routers.NOME_DO_APP.entrypoints=web,internal"
         - "traefik.http.services.NOME_DO_APP.loadbalancer.server.port=3000"
       restart_policy:
         condition: any
