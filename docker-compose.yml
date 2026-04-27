@@ -14,8 +14,10 @@ services:
       labels:
         - "traefik.enable=true"
         - "traefik.docker.network=proxy"
-        - "traefik.http.routers.NOME_DO_APP.rule=Host(`NOME_DO_APP.ulbra.internal`)"
-        - "traefik.http.routers.NOME_DO_APP.entrypoints=web,internal"
+        - "traefik.http.routers.NOME_DO_APP.rule=Host(`NOME_DO_APP.ulbra.ai`)"
+        - "traefik.http.routers.NOME_DO_APP.entrypoints=websecure,internal"
+        - "traefik.http.routers.NOME_DO_APP.tls=true"
+        - "traefik.http.routers.NOME_DO_APP.tls.certresolver=letsencrypt"
         - "traefik.http.services.NOME_DO_APP.loadbalancer.server.port=3000"
       restart_policy:
         condition: any

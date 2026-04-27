@@ -22,9 +22,9 @@ Template para criar novas aplicações no datacenter da ULBRA.
 
 | Ambiente | Trigger | Rota |
 |---|---|---|
-| Dev | Push na main (automático) | `dev.NOME_DO_APP.ulbra.internal` |
-| Staging | Botão manual no GitHub Actions | `staging.NOME_DO_APP.ulbra.internal` |
-| Production | Botão manual no GitHub Actions | `NOME_DO_APP.ulbra.internal` |
+| Dev | Push na main (automático) | `dev.NOME_DO_APP.ulbra.ai` |
+| Staging | Botão manual no GitHub Actions | `staging.NOME_DO_APP.ulbra.ai` |
+| Production | Botão manual no GitHub Actions | `NOME_DO_APP.ulbra.ai` |
 
 ## Pipeline
 
@@ -35,6 +35,24 @@ Push na main → Build imagem → Deploy DEV (automático)
                                   │
                          ├── staging (manual)
                          └── production (manual)
+```
+
+## Roteamento (Traefik)
+
+Os serviços rodam atrás do Traefik com 2 entrypoints:
+
+- **websecure** (:443) — HTTPS público (com cert do Let's Encrypt)
+- **internal** (:8081) — só pela VPN da ULBRA
+
+A label `tls.certresolver=letsencrypt` faz o Traefik pedir cert automaticamente. O cert é emitido em ~30s no primeiro request e renovado a cada 60 dias.
+
+### Apps internos (sem acesso externo)
+
+Se o app for só pra uso interno, troca:
+
+```yaml
+- "traefik.http.routers.NOME_DO_APP.entrypoints=internal"
+# remove tls=true e tls.certresolver
 ```
 
 ## Variáveis de ambiente
@@ -49,6 +67,6 @@ Configurar no `docker-compose.yml`:
 
 Métricas, logs e traces são coletados automaticamente:
 
-- **Grafana**: http://172.18.152.201:3001
-- **Logs**: Grafana > Explore > Loki > `{compose_service="NOME_DO_APP"}`
+- **Grafana**: https://grafana.ulbra.ai (interno)
+- **Logs**: Grafana > Explore > Loki > `{service=~".*NOME_DO_APP.*"}`
 - **Métricas**: via OpenTelemetry (adicionar SDK ao projeto)
