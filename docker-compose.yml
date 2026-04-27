@@ -19,6 +19,12 @@ services:
         - "traefik.http.routers.NOME_DO_APP.tls=true"
         - "traefik.http.routers.NOME_DO_APP.tls.certresolver=letsencrypt"
         - "traefik.http.services.NOME_DO_APP.loadbalancer.server.port=3000"
+        # Homepage (apps.ulbra.ai) — auto-discovery via Docker labels
+        - "homepage.group=Aplicações"
+        - "homepage.name=NOME_DO_APP"
+        - "homepage.icon=mdi-application"
+        - "homepage.href=https://NOME_DO_APP.ulbra.ai"
+        - "homepage.description=Descrição curta do app"
       restart_policy:
         condition: any
       resources:
