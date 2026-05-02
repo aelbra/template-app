@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node --watch src/index.js",
-    "build": "echo 'Adicione um build (ex: tsc, esbuild) ou copie src/ para dist/'",
-    "start": "node dist/index.js",
+    "start": "node src/index.js",
     "test": "echo 'Sem testes ainda'",
     "lint": "echo 'Sem lint configurado'"
   },
