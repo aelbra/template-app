@@ -6,17 +6,20 @@ on:
   workflow_dispatch:
     inputs:
       promote_to:
-        description: "Promover para"
+        description: "Promover para qual ambiente"
         required: true
         type: choice
         options:
           - staging
           - production
+      image_tag:
+        description: "Tag da imagem (SHA curto). Default = última do dev."
+        required: false
+        type: string
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  APP_NAME: NOME_DO_APP
 
 jobs:
   build:
@@ -31,14 +34,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login no GitHub Container Registry
+      - name: Login no GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Definir tag
+      - name: Tag (SHA curto)
         id: sha
         run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
@@ -60,9 +63,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Deploy
+        env:
+          APP_NAME: ${{ vars.APP_NAME }}
+          ENV_SLUG: dev
+          API_HOST: ${{ vars.API_HOST_DEV }}
+          API_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}
         run: |
-          export IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}
-          docker stack deploy -c docker-compose.yml ${{ env.APP_NAME }}-dev
+          docker stack deploy -c deploy/docker-compose.swarm.yml ${{ vars.APP_NAME }}-dev
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          docker stack ps ${{ vars.APP_NAME }}-dev --no-trunc | head -20 || true
+          docker service logs ${{ vars.APP_NAME }}-dev_api --tail 50 || true
 
   deploy-staging:
     name: Deploy Staging
@@ -71,9 +83,22 @@ jobs:
     environment: staging
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy
+      - name: Resolve image tag
+        id: tag
         run: |
-          docker stack deploy -c docker-compose.yml ${{ env.APP_NAME }}-staging
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+      - name: Deploy
+        env:
+          APP_NAME: ${{ vars.APP_NAME }}
+          ENV_SLUG: staging
+          API_HOST: ${{ vars.API_HOST_STAGING }}
+          API_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+        run: |
+          docker stack deploy -c deploy/docker-compose.swarm.yml ${{ vars.APP_NAME }}-staging
 
   deploy-production:
     name: Deploy Production
@@ -82,6 +107,20 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy
+      - name: Resolve image tag
+        id: tag
         run: |
-          docker stack deploy -c docker-compose.yml ${{ env.APP_NAME }}-production
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "Tag obrigatória em produção (informe SHA curto)" >&2
+            exit 1
+          fi
+      - name: Deploy
+        env:
+          APP_NAME: ${{ vars.APP_NAME }}
+          ENV_SLUG: prod
+          API_HOST: ${{ vars.API_HOST_PROD }}
+          API_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+        run: |
+          docker stack deploy -c deploy/docker-compose.swarm.yml ${{ vars.APP_NAME }}-prod
