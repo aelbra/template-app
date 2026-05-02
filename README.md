@@ -1,72 +1,67 @@
-# Template App — ULBRA Cloud
+# template-app — ULBRA Cloud
 
-Template para criar novas aplicações no datacenter da ULBRA.
+Template oficial para novas aplicações no datacenter da ULBRA. Já vem configurado com:
+
+- **Docker Swarm** multi-ambiente (dev/staging/prod)
+- **Traefik** com TLS Let's Encrypt e roteamento por hostname
+- **OpenTelemetry → SigNoz** (traces, métricas, logs)
+- **CI/CD** via GitHub Actions (build no push, promoção manual)
+- **Validação de PR title** (regex `tipo(AEL-NNN): descrição`)
 
 ## Como usar
 
-1. Criar novo repo a partir deste template (botão **"Use this template"** no GitHub)
-2. Substituir `NOME_DO_APP` em todos os arquivos pelo nome da sua aplicação
-3. Ajustar o `Dockerfile` para a linguagem/framework do projeto
-4. Ajustar a porta no `docker-compose.yml` e no healthcheck
-5. Push na main — deploy automático em dev
+1. Clica em **"Use this template"** no GitHub
+2. Roda `bash scripts/setup.sh` (renomeia placeholder, faz commit inicial) — _ou_ segue o passo a passo em [`docs/primeiro-deploy.md`](docs/primeiro-deploy.md)
+3. Configura as **GitHub Variables** do repo (ver `docs/primeiro-deploy.md`)
+4. Push na main → deploy automático em dev em https://`${APP_NAME}-dev.ulbra.ai`
 
-## Arquivos
+## Estrutura
 
-| Arquivo | O que faz |
-|---|---|
-| `Dockerfile` | Como buildar a imagem Docker |
-| `docker-compose.yml` | Stack para Docker Swarm com labels do Traefik |
-| `.github/workflows/deploy.yml` | Pipeline CI/CD (dev/staging/prod) |
-
-## Ambientes
-
-| Ambiente | Trigger | Rota |
-|---|---|---|
-| Dev | Push na main (automático) | `dev.NOME_DO_APP.ulbra.ai` |
-| Staging | Botão manual no GitHub Actions | `staging.NOME_DO_APP.ulbra.ai` |
-| Production | Botão manual no GitHub Actions | `NOME_DO_APP.ulbra.ai` |
+```
+.
+├── .github/workflows/      # CI, deploy, pr-title
+├── deploy/
+│   └── docker-compose.swarm.yml   # stack do Swarm (3 redes, OTel, multi-env)
+├── docs/
+│   ├── primeiro-deploy.md  # passo a passo de configuração
+│   └── dotnet.md           # como adaptar pra .NET
+├── src/
+│   ├── otel.js             # bootstrap OpenTelemetry
+│   └── index.js            # entrypoint placeholder
+├── Dockerfile              # multi-stage Node
+├── package.json
+├── CLAUDE.md               # convenções pra agentes IA
+└── README.md
+```
 
 ## Pipeline
 
 ```
-Push na main → Build imagem → Deploy DEV (automático)
-                                  │
-                    GitHub Actions > Run workflow
-                                  │
-                         ├── staging (manual)
-                         └── production (manual)
+push na main → build imagem → deploy DEV (automático)
+                                 │
+                       Actions ▸ Run workflow
+                                 │
+                  ├── promover staging (manual + image_tag)
+                  └── promover production (manual + image_tag)
 ```
 
-## Roteamento (Traefik)
+## Observabilidade
 
-Os serviços rodam atrás do Traefik com 2 entrypoints:
+Telemetria sai automaticamente pra https://signoz.ulbra.ai. O serviço aparece como `${APP_NAME}-api` separado por `deployment.environment` (dev/staging/prod).
 
-- **websecure** (:443) — HTTPS público (com cert do Let's Encrypt)
-- **internal** (:8081) — só pela VPN da ULBRA
+Pra adicionar métricas customizadas em Node:
 
-A label `tls.certresolver=letsencrypt` faz o Traefik pedir cert automaticamente. O cert é emitido em ~30s no primeiro request e renovado a cada 60 dias.
-
-### Apps internos (sem acesso externo)
-
-Se o app for só pra uso interno, troca:
-
-```yaml
-- "traefik.http.routers.NOME_DO_APP.entrypoints=internal"
-# remove tls=true e tls.certresolver
+```js
+const { metrics } = require('@opentelemetry/api');
+const meter = metrics.getMeter('myapp');
+const counter = meter.createCounter('myapp.requests.total');
+counter.add(1, { route: '/foo' });
 ```
 
-## Variáveis de ambiente
+## Convenções
 
-Configurar no `docker-compose.yml`:
+- **Branch**: `<usuario>/<sigla>-<numero>-<descricao>` (ex: `felipe-allmeida/ael-123-fix-login`)
+- **Commit/PR**: `tipo(SIGLA-NUMERO): descrição` (ex: `feat(AEL-123): adicionar login`)
+- **Idioma**: português (commits, docs, comentários)
 
-- `NODE_ENV` — ambiente (development/production)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` — endpoint do OpenTelemetry (já configurado)
-- `OTEL_SERVICE_NAME` — nome do serviço no monitoring
-
-## Monitoring
-
-Métricas, logs e traces são coletados automaticamente:
-
-- **Grafana**: https://grafana.ulbra.ai (interno)
-- **Logs**: Grafana > Explore > Loki > `{service=~".*NOME_DO_APP.*"}`
-- **Métricas**: via OpenTelemetry (adicionar SDK ao projeto)
+Mais detalhes em [`CLAUDE.md`](CLAUDE.md).

@@ -1,0 +1,9 @@
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  validate:
+    uses: aelbra/.github/.github/workflows/pr-title.yml@main
