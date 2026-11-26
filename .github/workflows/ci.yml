@@ -27,3 +27,23 @@ jobs:
 
       - name: Build (Docker)
         run: docker build -t ${{ github.event.repository.name }}:pr .
+
+  # Portão único do CI: o conjunto de regras «CI obrigatório» da organização exige este job no
+  # merge para a main. Passa só se todos os jobs acima passaram (pulado conta como ok).
+  ci:
+    name: CI
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Todos os jobs do CI passaram
+        env:
+          RESULTADOS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Resultados: $RESULTADOS"
+          case " $RESULTADOS " in
+            *" failure "* | *" cancelled "*)
+              echo "::error::Algum job do CI falhou ou foi cancelado."
+              exit 1
+              ;;
+          esac
